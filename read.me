@@ -1,0 +1,66 @@
+1. Reglas Globales de Interfaz y Recursos (Global UI)El espacio total es de 800x600 px. Se dividirá estrictamente en dos zonas rígidas inamovibles.Menú Lateral (Sidebar): 120 x 600 px (Fijo a la izquierda).Área de Contenido (Main): 680 x 600 px (Derecha, cambia según el módulo).Tipografía: Usaremos la fuente nativa lv_font_montserrat precompilada en LVGL en 4 tamaños estrictos para evitar emborronamientos:Texto Pequeño: 20 px (Cuerpos de noticias, chistes).Texto Medio: 28 px (Botones estándar, etiquetas de configuración).Encabezados: 36 px (Títulos de módulos, Reloj de la barra).Masivo: 72+ px (Reloj del modo sleep, Temperatura del clima, Temporizador).Recursos Gráficos: Cero imágenes complejas. Usaremos la librería de símbolos nativa de LVGL (LV_SYMBOL_...) y Emojis estándar de texto UTF-8 codificados directamente en C.2. Mapa de Navegación y Flujo UXEl sistema es plano. Nunca hay más de 2 clics para llegar a cualquier función.OrigenAcción del UsuarioDestino / ResultadoNº ClicsMenú LateralPulsa icono de un MóduloCambia Área de Contenido al Módulo1Cualquier MóduloInactividad > 2 minsPantalla Negra + Reloj (Modo Sleep)0 (Auto)Modo SleepUn toque firme en pantallaDespierta en el último módulo activo1Reloj / AlarmaPulsa "Editar" en Alarma 1Abre Modal Edición (Hora, Sonido, Amanecer)1Alarma (Sonando)Pulsa "Snooze"Silencia y reprograma a +5 min (Vuelve a Sleep)1Súper-AlmanaquePulsa "Leer Noticia"Abre Modal Modal Estático Texto Completo1AjustesPulsa "Personalizar Almanaque"Abre Modal de Filtros RSS y Chistes13. Layouts Detallados por Módulo (800x600 px)📱 3.0 Menú Lateral Izquierdo (120 x 600 px)Siempre visible (excepto en Sleep/Alarma disparada).Estructura: Columna de 5 botones de 100 x 100 px, más un botón de ajustes abajo. Margen de 10 px.Orden: [ ⏰ ] (Alarmas) -> [ 📻 ] (Radio) -> [ ⛅ ] (Clima) -> [ 📰 ] (Almanaque) -> [ 🧮 ] (Herramientas).Fondo: Inferior: [ ⚙️ ] (Ajustes).⏰ 3.1 Módulo: Reloj y Alarmas (680 x 600 px)Header (0-100px): Reloj digital secundario centrado (font: 48px).Filas de Alarma (120-500px): 4 tarjetas horizontales estáticas de 640 x 90 px.Interior: Texto "07:30 AM" a la izquierda. En el centro, indicadores [ 🌅 Amanecer ] y [ 🎵 Radio ]. A la derecha, botón Toggle gigante [ ON/OFF ] de 120 x 70 px.Interacción: Pulsar en la tarjeta (fuera del toggle) abre el Modal de Edición.📻 3.2 Módulo: Radio Streaming (680 x 600 px)Header (0-150px): Nombre de la emisora actual (Ej: "RADIO 3") y estado "Reproduciendo...".Matriz de Emisoras (150-450px): Rejilla de 3x2 (6 botones).Tamaño: Cada botón mide 200 x 130 px.Texto: Solo el nombre fijo (Ej: "M80", "RNE").Controles Inferiores (450-600px):Botón [ 🛑 STOP ] de 300 x 100 px.Controles [ ➖ VOL ] y [ ➕ VOL ] de 150 x 100 px a los lados.⛅ 3.3 Módulo: Clima (680 x 600 px)Aprovechando los 600px de altura, este panel respira mejor.Mitad Superior (Actual) (0-300px): Icono gigante a la izquierda (150x150px) y Temperatura Masiva (Font 72px) en el centro. Abajo, pequeños textos: "Humedad: 40% | Viento: 15 km/h".Mitad Inferior (Previsión) (320-600px): 3 columnas verticales de 210 x 250 px.Interior: "Mañana" / "Miércoles" / "Jueves". Icono mediano y Max/Min.📰 3.4 Módulo: Súper-Almanaque (680 x 600 px)Cuadrante Superior Izquierdo (430 x 240 px): Noticia RSS. Título (Font 28) + 4 líneas de cuerpo. Botón debajo [ LEER COMPLETA ].Cuadrante Superior Derecho (210 x 240 px): Efemérides. Tarjeta estrecha.Cuadrante Inferior Izquierdo (320 x 240 px): Curiosidad del día.Cuadrante Inferior Derecho (320 x 240 px): Chiste.Barra Inferior (500-600px): Botón ancho de 640x80 px [ 🔄 REFRESCAR ALMANAQUE ].🧮 3.5 Módulo: Calculadora y Temporizador (680 x 600 px)Dividido por la mitad verticalmente.Izquierda (Calculadora) (340 x 600 px): Pantalla de resultados (100px alto). Teclado numérico 4x4, botones rígidos de 75 x 75 px.Derecha (Temporizador) (340 x 600 px): Reloj masivo 00:00. Botones [ +1 MIN ], [ +5 MIN ] arriba. Botones gigantes [ INICIAR ] y [ RESET ] abajo.4. Arquitectura de Backend y Datos (El Ecosistema)Para manejar todo esto sin colapsar la RAM de Tiny Core Linux, la estructura de carpetas y procesos será estricta:Sistema de Archivos/opt/app/main.bin -> El ejecutable en C compilado con LVGL./opt/scripts/ -> Contiene los Bash (weather.sh, almanac.sh, radio.sh)./opt/data/ -> Los JSON que comunican el Bash con el binario C (weather.json, almanac.json, config.json). Aquí también residen los diccionarios .txt del Santoral./opt/media/ -> Sonidos de alarma en .mp3 local.Hilos en C (Pthreads)Tu archivo main.c no será un monolito. Tendrá 3 hilos paralelos:Hilo Principal (LVGL UI): Dibuja a 60 FPS, maneja los eventos táctiles y el modo Sleep.Hilo de Control de Alarma: Se despierta 1 vez por segundo. Comprueba si la hora local coincide con alarm_list[]. Si es así, gestiona el hardware (brillo PWM en /sys/class/backlight/...) y lanza audios.Hilo de Red / Cron: Cada 30 minutos ejecuta llamadas de sistema (system("/opt/scripts/weather.sh")), parsea los JSON resultantes con cJSON y bloquea el Mutex para actualizar los textos de la interfaz gráfica sin pantallazos azules.5. Roadmap de Desarrollo Técnico (Paso a Paso)Preparación de SO (Tiny Core Linux):Instalar Xvesa o usar directamente Framebuffer (/dev/fb0).CRÍTICO: Configurar y calibrar tslib (Touchscreen Library) para el panel resistivo del IEI AFL-08AH. Sin esto, los toques no coincidirán con los píxeles.Infraestructura C y LVGL:Descargar LVGL v8/v9. Configurar el lv_port_linux_frame_buffer.Crear la estructura del Sidebar y el mecanismo de cambio de pantallas (ocultar un contenedor y mostrar otro).Integración de Hardware:Mapear la ruta de control de brillo del panel IEI (Suele estar en /sys/class/backlight/intel_backlight/brightness).Probar la ejecución de mpg123 -C mediante tuberías (pipes) desde C para asegurar la radio y los tonos de alarma.Desarrollo de Módulos Visuales:Programar cada pantalla (layout rígido) inyectando datos falsos (mockups).Conexión Backend-Frontend:Escribir los scripts Bash, parsear los JSONs en C y reemplazar los datos falsos por los reales.
+
+6. Unificación de Código y Lógica Gráfica (Integration & Coherence)
+Para que el panel IEI AFL-08AH mantenga un rendimiento fluido a 60 FPS y no colapse la memoria RAM de Tiny Core Linux tras semanas de uso ininterrumpido, la relación entre la interfaz gráfica (Frontend en LVGL) y la lógica del sistema (Backend en C y Bash) debe seguir un patrón arquitectónico estricto.
+
+6.1 Gestión de Memoria y Pantallas (State Machine)
+En sistemas embebidos, crear y destruir objetos gráficos constantemente genera fragmentación de memoria (Memory Leaks). Dado que nuestro ecosistema tiene módulos finitos y estáticos, adoptaremos el patrón "Renderizado Único y Ocultación":
+
+Inicialización al Arranque: Cuando el main.c se ejecuta, LVGL dibuja todos los módulos en la memoria durante los primeros 2 segundos (Reloj, Radio, Clima, Almanaque, Calculadora).
+
+Capas Superpuestas: Todos los módulos ocupan exactamente las mismas coordenadas (x: 120, y: 0, tamaño 680x600 px).
+
+El Gestor de Vistas (View Manager): En lugar de borrar una pantalla para cargar otra, el código utiliza la bandera nativa de LVGL LV_OBJ_FLAG_HIDDEN. Cuando el usuario pulsa un botón en el menú lateral, el sistema simplemente añade la bandera "oculto" al módulo actual y se la quita al módulo solicitado.
+
+Resultado: Cambios de pantalla instantáneos (0 ms de lag) y consumo de memoria estático y predecible.
+
+6.2 Coherencia Visual y Estilos Globales (Theming)
+Para mantener la jerarquía visual diseñada y no repetir cientos de líneas de código, definiremos un diccionario de estilos globales al inicio del programa. Ningún botón o texto se estiliza individualmente.
+
+Blindaje Anti-Scroll: Por defecto, LVGL asume que los contenedores tienen desplazamiento. A todo contenedor principal y tarjeta se le aplicará obligatoriamente la función lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE). Esto es vital para que un roce accidental en la pantalla resistiva no mueva la interfaz.
+
+Clases de Botones (Button Classes):
+
+style_btn_massive: Aplicado a acciones críticas (Play, Guardar, Snooze). Tendrán un padding interno de 20px y usarán la paleta de color principal.
+
+style_btn_sidebar: Aplicado a los iconos de navegación. Color base transparente, pero cambian a estado "Presionado/Activo" (LV_STATE_CHECKED) reteniendo un color de resalte visual continuo para que el usuario sepa en qué módulo se encuentra.
+
+style_text_data: Aplicado a las inyecciones de texto dinámico (RSS, JSON). Asegura la fuente lv_font_montserrat_28 con la propiedad LV_LABEL_LONG_WRAP para que el texto salte de línea automáticamente sin desbordar su tarjeta contenedora.
+
+6.3 Interacción de Hardware (Táctil Resistivo)
+La pantalla resistiva del IEI exige programación defensiva contra los "toques fantasma" y rebotes mecánicos (bouncing).
+
+El driver de entrada (Input Device Driver) que conecta tslib con LVGL incluirá un umbral de lectura estricto. LVGL solo registrará un LV_EVENT_CLICKED si el estado de presión del dedo pasa a "liberado" (Release) en las mismas coordenadas donde se inició, ignorando micro-arrastres accidentales de menos de 15 píxeles.
+
+Los botones tipo "Toggle" (ON/OFF de alarmas) no reaccionarán al evento LV_EVENT_PRESSED (momento inicial del toque), sino exclusivamente a LV_EVENT_CLICKED (momento de soltar el dedo), garantizando que el usuario realmente quería confirmar la acción.
+
+6.4 El Puente de Datos (Backend a Frontend)
+La regla de oro del sistema es: LVGL nunca espera a Internet. Si la UI hiciera una petición HTTP directa para descargar el clima, la pantalla entera se congelaría durante segundos. Para solucionar esto, aplicamos un patrón de Productor-Consumidor con Mutex:
+
+El Productor (Scripts Bash): Procesos independientes y ciegos. Un demonio cron ejecuta scripts (update_weather.sh, update_almanac.sh) en segundo plano. Cuando terminan de descargar y filtrar datos de internet, guardan un archivo .json limpio en la ruta /tmp/ (que en Tiny Core reside en la ultra-rápida memoria RAM, no en disco).
+
+El Consumidor (Hilo Secundario de C): Un hilo en C (pthread) comprueba periódicamente si esos archivos JSON han cambiado.
+
+El Mutex (El Guardia de Tráfico): Si hay datos nuevos (ej. una nueva temperatura), el hilo secundario solicita un bloqueo (lv_mutex_lock). Solo cuando LVGL ha terminado de dibujar el fotograma actual, permite que el hilo secundario use cJSON para leer el archivo e inyecte el nuevo texto mediante lv_label_set_text(). Una vez hecho, libera el bloqueo. Esto elimina al 100% el riesgo de fallos de segmentación (Segmentation Faults) por colisiones de memoria.
+
+6.5 Flujo de Vida del Main (main.c Lifecycle)
+Para comprender cómo se orquesta todo lo anterior, este es el orden real de ejecución del código cuando el panel recibe corriente:
+
+init_os(): Tiny Core arranca. Se montan las unidades y el Framebuffer /dev/fb0.
+
+lv_init(): Arranca el motor gráfico.
+
+lv_port_disp_init() & lv_port_indev_init(): Se enlaza LVGL con la pantalla física y la capa táctil calibrada por tslib.
+
+init_global_styles(): Se cargan fuentes, colores base y la regla global anti-scroll.
+
+build_sidebar() + build_modules(): Se crean todos los objetos en RAM. Se ocultan todos menos el Reloj.
+
+pthread_create(): Se lanzan los hilos paralelos (Controlador de Alarmas / Lector JSON / Gestor de Energía).
+
+Bucle Infinito (while(1)):
+
+lv_task_handler(): Dibuja la pantalla y procesa toques (cada 5 ms).
+
+usleep(5000): Libera la CPU para que el sistema operativo y los scripts Bash puedan trabajar, manteniendo el uso de procesador del panel muy por debajo del 10%.
+
